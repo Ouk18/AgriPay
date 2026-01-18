@@ -60,8 +60,21 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('SW Registered'))
+          navigator.serviceWorker.register('./sw.js', { scope: '/' })
+            .then(reg => {
+              console.log('SW Registered');
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Une nouvelle version est disponible
+                    if(confirm("Une mise à jour est disponible. Voulez-vous redémarrer l'application ?")) {
+                      window.location.reload();
+                    }
+                  }
+                };
+              };
+            })
             .catch(err => console.log('SW Registration failed', err));
         });
       }

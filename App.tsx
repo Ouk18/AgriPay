@@ -4,7 +4,7 @@ import {
   Scale, Wallet, Plus, Pickaxe, Loader2, LogOut, User as UserIcon, ShieldAlert,
   AlertTriangle, Trash2, X, Download, HelpCircle, Smartphone, Share, DownloadCloud,
   LayoutDashboard, Users, Calendar as CalendarIcon, Settings as SettingsIcon, RefreshCw,
-  WifiOff, ShoppingBag, BookOpen, PlusCircle, ShieldCheck
+  WifiOff, ShoppingBag, BookOpen, PlusCircle, ShieldCheck, AlertCircle
 } from 'lucide-react';
 import { supabase } from './lib/supabase.ts';
 import { Employee, Harvest, Advance, RainEvent, MarketSettings, AppData, WorkTask, UserProfile, Entrepreneur } from './types.ts';
@@ -18,7 +18,7 @@ import RainForm from './components/RainForm.tsx';
 import TaskForm from './components/TaskForm.tsx';
 import Auth from './components/Auth.tsx';
 
-const APP_VERSION = "v2.3.2";
+const APP_VERSION = "v2.3.3";
 
 const INITIAL_SETTINGS: MarketSettings = {
   payRateHevea: 75,
@@ -37,6 +37,7 @@ const App: React.FC = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showForceButton, setShowForceButton] = useState(false);
 
   const [data, setData] = useState<AppData>({
     employees: [],
@@ -60,15 +61,7 @@ const App: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [
-        { data: employees },
-        { data: entrepreneurs },
-        { data: harvests },
-        { data: advances },
-        { data: workTasks },
-        { data: rainEvents },
-        { data: settingsData }
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         supabase.from('employees').select('*').order('name'),
         supabase.from('entrepreneurs').select('*').order('name'),
         supabase.from('harvests').select('*').order('date', { ascending: false }),
@@ -78,31 +71,33 @@ const App: React.FC = () => {
         supabase.from('settings').select('*').maybeSingle()
       ]);
 
+      const [employeesRes, entrepreneursRes, harvestsRes, advancesRes, tasksRes, rainRes, settingsRes] = results;
+
       setData({
-        employees: (employees || []).map(e => ({
+        employees: (employeesRes.status === 'fulfilled' ? (employeesRes.value.data || []) : []).map((e: any) => ({
           id: e.id, name: e.name, status: e.status, crop: e.crop, color: e.color,
           iconName: e.icon_name || 'user', createdAt: new Date(e.created_at || Date.now()).getTime(),
           phone: e.phone, notes: e.notes, user_id: e.user_id
         })),
-        entrepreneurs: (entrepreneurs || []).map(en => ({
+        entrepreneurs: (entrepreneursRes.status === 'fulfilled' ? (entrepreneursRes.value.data || []) : []).map((en: any) => ({
           id: en.id, name: en.name, specialty: en.specialty, phone: en.phone, color: en.color
         })),
-        harvests: (harvests || []).map(h => ({ 
-          id: h.id, employeeId: h.employee_id, date: h.date, weight: h.weight, payRate: h.pay_rate, crop: h.crop 
+        harvests: (harvestsRes.status === 'fulfilled' ? (harvestsRes.value.data || []) : []).map((h: any) => ({ 
+          id: h.id, employee_id: h.employee_id, employeeId: h.employee_id, date: h.date, weight: h.weight, payRate: h.pay_rate, crop: h.crop 
         })),
-        advances: (advances || []).map(a => ({ 
+        advances: (advancesRes.status === 'fulfilled' ? (advancesRes.value.data || []) : []).map((a: any) => ({ 
           id: a.id, employeeId: a.employee_id, entrepreneurId: a.entrepreneur_id, 
           date: a.date, amount: a.amount, category: a.category || 'AVANCE',
           paymentMethod: a.payment_method, notes: a.notes 
         })),
-        workTasks: (workTasks || []).map(t => ({ 
+        workTasks: (tasksRes.status === 'fulfilled' ? (tasksRes.value.data || []) : []).map((t: any) => ({ 
           id: t.id, employeeId: t.employee_id, date: t.date, description: t.description, amount: t.amount 
         })),
-        rainEvents: rainEvents || [],
-        settings: settingsData ? {
-          payRateHevea: settingsData.pay_rate_hevea, payRateCacao: settingsData.pay_rate_cacao,
-          marketPriceHevea: settingsData.market_price_hevea, marketPriceCacao: settingsData.market_price_cacao,
-          cacaoPayRatio: settingsData.cacao_pay_ratio
+        rainEvents: rainRes.status === 'fulfilled' ? (rainRes.value.data || []) : [],
+        settings: (settingsRes.status === 'fulfilled' && settingsRes.value.data) ? {
+          payRateHevea: settingsRes.value.data.pay_rate_hevea, payRateCacao: settingsRes.value.data.pay_rate_cacao,
+          marketPriceHevea: settingsRes.value.data.market_price_hevea, marketPriceCacao: settingsRes.value.data.market_price_cacao,
+          cacaoPayRatio: settingsRes.value.data.cacao_pay_ratio
         } : INITIAL_SETTINGS
       });
     } catch (err) {
@@ -115,21 +110,31 @@ const App: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+    
+    // Sécurité : Si après 8s ça ne charge pas, on montre un bouton pour forcer l'accès
+    const forceTimer = setTimeout(() => {
+      if (isLoading && mounted) setShowForceButton(true);
+    }, 8000);
+
     const initialize = async () => {
-      const { data: { session: s } } = await supabase.auth.getSession();
-      if (!mounted) return;
-      if (s) {
-        setSession(s);
-        fetchData();
-        // Fetch profile explicitly
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle();
-        if (mounted && p) {
-          setProfile(p);
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        
+        if (s) {
+          setSession(s);
+          await fetchData();
+          const { data: p } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle();
+          if (mounted && p) setProfile(p);
+        } else {
+          setIsLoading(false);
         }
-      } else {
-        setIsLoading(false);
+      } catch (err) {
+        console.error("Initialization error:", err);
+        if (mounted) setIsLoading(false);
       }
     };
+
     initialize();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, s) => {
@@ -145,24 +150,40 @@ const App: React.FC = () => {
       }
     });
     
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { 
+      mounted = false; 
+      subscription.unsubscribe();
+      clearTimeout(forceTimer);
+    };
   }, [fetchData]);
 
   if (!session && !isLoading) return <Auth version={APP_VERSION} />;
   
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-stone-50 text-emerald-950">
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-8 px-6 text-center">
         <div className="bg-emerald-900 p-8 rounded-[3rem] text-white shadow-2xl animate-bounce">
           <Scale className="w-12 h-12" />
         </div>
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-2">
           <span className="text-2xl font-black tracking-tighter">AgriPay</span>
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-800/40">Synchronisation...</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-800/40">Synchronisation sécurisée...</span>
           </div>
         </div>
+        
+        {showForceButton && (
+          <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <p className="text-xs text-stone-400 font-medium max-w-xs">La connexion semble lente ou bloquée par votre réseau.</p>
+            <button 
+              onClick={() => setIsLoading(false)}
+              className="px-8 py-4 bg-white border border-stone-200 text-stone-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all flex items-center gap-2 mx-auto"
+            >
+              <AlertCircle className="w-4 h-4 text-amber-500" /> Forcer l'entrée
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -291,7 +312,7 @@ const App: React.FC = () => {
 
       {pendingDeletion && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-emerald-950/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 text-center space-y-8 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white w-full max-sm rounded-[3rem] p-10 text-center space-y-8 shadow-2xl animate-in zoom-in-95">
             <div className="w-24 h-24 bg-rose-50 text-rose-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><AlertTriangle className="w-12 h-12" /></div>
             <div className="space-y-2">
               <h4 className="text-2xl font-black text-emerald-950 tracking-tighter">Supprimer ?</h4>
@@ -303,6 +324,43 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODALS RENDERER */}
+      {showHarvestModal && (
+        <HarvestForm 
+          employees={data.employees.filter(e => e.status === 'ACTIF')} 
+          settings={data.settings} 
+          onClose={() => setShowHarvestModal(false)} 
+          onSubmit={async (h) => { await supabase.from('harvests').insert([{employee_id: h.employeeId, weight: h.weight, pay_rate: h.payRate, date: h.date, crop: h.crop}]); fetchData(); setShowHarvestModal(false); }}
+          initialEmployeeId={typeof showHarvestModal === 'object' ? showHarvestModal.employeeId : undefined}
+          initialDate={typeof showHarvestModal === 'object' ? showHarvestModal.date : undefined}
+        />
+      )}
+      {showTaskModal && (
+        <TaskForm 
+          employees={data.employees.filter(e => e.status === 'ACTIF')} 
+          onClose={() => setShowTaskModal(false)} 
+          onSubmit={async (t) => { await supabase.from('work_tasks').insert([{employee_id: t.employeeId, description: t.description, amount: t.amount, date: t.date}]); fetchData(); setShowTaskModal(false); }}
+          initialEmployeeId={typeof showTaskModal === 'object' ? showTaskModal.employeeId : undefined}
+          initialDate={typeof showTaskModal === 'object' ? showTaskModal.date : undefined}
+        />
+      )}
+      {showExpenseModal && (
+        <ExpenseForm 
+          employees={data.employees} 
+          entrepreneurs={data.entrepreneurs} 
+          onClose={() => setShowExpenseModal(false)} 
+          onSubmit={async (a) => { await supabase.from('advances').insert([{employee_id: a.employeeId, entrepreneur_id: a.entrepreneurId, amount: a.amount, date: a.date, category: a.category, payment_method: a.paymentMethod, notes: a.notes}]); fetchData(); setShowExpenseModal(false); }}
+          initialData={typeof showExpenseModal === 'object' ? showExpenseModal : undefined}
+        />
+      )}
+      {showRainModal && (
+        <RainForm 
+          date={showRainModal.date} 
+          onClose={() => setShowRainModal(null)} 
+          onSubmit={async (r) => { await supabase.from('rain_events').insert([r]); fetchData(); setShowRainModal(null); }} 
+        />
       )}
     </div>
   );
