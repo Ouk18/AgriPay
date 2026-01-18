@@ -18,7 +18,7 @@ import RainForm from './components/RainForm.tsx';
 import TaskForm from './components/TaskForm.tsx';
 import Auth from './components/Auth.tsx';
 
-const APP_VERSION = "v2.3.3";
+const APP_VERSION = "v2.3.4";
 
 const INITIAL_SETTINGS: MarketSettings = {
   payRateHevea: 75,
@@ -73,6 +73,14 @@ const App: React.FC = () => {
 
       const [employeesRes, entrepreneursRes, harvestsRes, advancesRes, tasksRes, rainRes, settingsRes] = results;
 
+      // Si toutes les requêtes échouent avec 403, c'est que la session est invalide
+      const allForbidden = results.every(res => res.status === 'fulfilled' && res.value.error?.code === '42501');
+      if (allForbidden) {
+        console.warn("Accès refusé. Session probablement invalide.");
+        handleLogout();
+        return;
+      }
+
       setData({
         employees: (employeesRes.status === 'fulfilled' ? (employeesRes.value.data || []) : []).map((e: any) => ({
           id: e.id, name: e.name, status: e.status, crop: e.crop, color: e.color,
@@ -108,45 +116,40 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      await supabase.auth.signOut();
+      // On vide tout pour éviter les boucles infinies de session fantôme
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/'; 
+    } catch (e) {
+      window.location.reload();
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     
-    // Sécurité : Si après 8s ça ne charge pas, on montre un bouton pour forcer l'accès
     const forceTimer = setTimeout(() => {
       if (isLoading && mounted) setShowForceButton(true);
-    }, 8000);
+    }, 6000);
 
-    const initialize = async () => {
-      try {
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (!mounted) return;
-        
-        if (s) {
-          setSession(s);
-          await fetchData();
-          const { data: p } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle();
-          if (mounted && p) setProfile(p);
-        } else {
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error("Initialization error:", err);
-        if (mounted) setIsLoading(false);
-      }
-    };
-
-    initialize();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    // Initialisation via l'état d'auth uniquement
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, s) => {
       if (!mounted) return;
-      setSession(s);
+      
       if (s) {
-        fetchData();
+        setSession(s);
+        // On ne fetch que si on a une session
+        await fetchData();
         const { data: p } = await supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle();
-        if (mounted) setProfile(p);
+        if (mounted && p) setProfile(p);
       } else {
-        setIsLoading(false);
+        setSession(null);
         setProfile(null);
+        setIsLoading(false);
       }
     });
     
@@ -175,13 +178,21 @@ const App: React.FC = () => {
         
         {showForceButton && (
           <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-bottom-4">
-            <p className="text-xs text-stone-400 font-medium max-w-xs">La connexion semble lente ou bloquée par votre réseau.</p>
-            <button 
-              onClick={() => setIsLoading(false)}
-              className="px-8 py-4 bg-white border border-stone-200 text-stone-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all flex items-center gap-2 mx-auto"
-            >
-              <AlertCircle className="w-4 h-4 text-amber-500" /> Forcer l'entrée
-            </button>
+            <p className="text-xs text-stone-400 font-medium max-w-xs">La connexion semble bloquée ou les identifiants sont expirés.</p>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => setIsLoading(false)}
+                className="px-8 py-4 bg-white border border-stone-200 text-stone-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2 mx-auto"
+              >
+                <AlertCircle className="w-4 h-4 text-amber-500" /> Entrée d'urgence
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="text-[10px] font-black uppercase tracking-widest text-emerald-700 underline underline-offset-4"
+              >
+                Se reconnecter manuellement
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -232,7 +243,7 @@ const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => { setIsRefreshing(true); fetchData(); }} className={`p-3 bg-stone-100 rounded-2xl transition-all active:scale-90 ${isRefreshing ? 'animate-spin text-emerald-600' : 'text-stone-400'}`} title="Actualiser"><RefreshCw className="w-5 h-5" /></button>
-          <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="p-3 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-100 transition-all active:scale-90" title="Déconnexion"><LogOut className="w-5 h-5" /></button>
+          <button onClick={handleLogout} className="p-3 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-100 transition-all active:scale-90" title="Déconnexion"><LogOut className="w-5 h-5" /></button>
         </div>
       </header>
 

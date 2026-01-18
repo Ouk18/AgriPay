@@ -1,19 +1,16 @@
 
-const CACHE_NAME = 'agripay-v12';
+const CACHE_NAME = 'agripay-v14';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json',
-  'https://cdn.tailwindcss.com'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -28,35 +25,26 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // BYPASS TOTAL POUR SUPABASE ET L'AUTH
-  if (url.hostname.includes('supabase.co') || url.pathname.includes('auth/v1') || event.request.method !== 'GET') {
+  // NE PAS CACHER SUPABASE OU L'AUTH
+  if (url.hostname.includes('supabase.co') || url.pathname.includes('auth/v1')) {
     return;
   }
 
-  // STRATÉGIE : NETWORK FIRST (POUR LE JS/HTML)
-  // On tente de récupérer le contenu frais, si échec (offline), on prend le cache.
+  // STRATÉGIE : NETWORK ONLY POUR LES SCRIPTS TSX/JS EN DEV/VERCEL
+  if (url.pathname.endsWith('.tsx') || url.pathname.endsWith('.ts')) {
+    return;
+  }
+
+  // POUR LE RESTE : NETWORK FIRST
   event.respondWith(
     fetch(event.request)
-      .then((networkResponse) => {
-        // Si c'est un fichier statique de notre app, on met à jour le cache
-        if (networkResponse && networkResponse.status === 200 && url.origin === location.origin) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+      .then((res) => {
+        if (res && res.status === 200 && event.request.method === 'GET') {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
         }
-        return networkResponse;
+        return res;
       })
-      .catch(() => {
-        // Mode Hors-ligne
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
-          
-          // Si rien en cache pour une navigation, on renvoie index.html
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        });
-      })
+      .catch(() => caches.match(event.request))
   );
 });
