@@ -1,11 +1,10 @@
-
 import React, { useMemo } from 'react';
 import { AppData, UserRole } from '../types.ts';
 import { 
   TrendingUp, Scale, Wallet, PiggyBank, Package, 
   ExternalLink, User, CheckCircle2, Download, BarChart3, Calculator,
   TrendingDown, ShieldAlert, ArrowUpRight, ArrowDownRight, FileDown,
-  ShoppingBag, Truck, PieChart, Activity
+  ShoppingBag, Truck, PieChart, Activity, FileSpreadsheet
 } from 'lucide-react';
 
 interface Props {
@@ -57,9 +56,10 @@ const Dashboard: React.FC<Props> = ({ data, onExport, onNavigateToEmployee, user
         {canExport && (
           <button 
             onClick={onExport} 
-            className="flex items-center justify-center gap-3 px-8 py-5 bg-emerald-900 text-white rounded-[1.75rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-emerald-900/20 active:scale-95 transition-all"
+            className="flex items-center justify-center gap-3 px-8 py-5 bg-emerald-900 text-white rounded-[1.75rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-emerald-900/20 active:scale-95 transition-all group"
           >
-            <FileDown className="w-5 h-5" /> Exporter Rapport Mensuel
+            <FileSpreadsheet className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" /> 
+            Rapport Comptable Complet (.CSV)
           </button>
         )}
       </div>
@@ -172,7 +172,7 @@ const Dashboard: React.FC<Props> = ({ data, onExport, onNavigateToEmployee, user
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-black text-rose-600">{due.toLocaleString()} F</span>
-                        <ArrowRight className="w-4 h-4 text-stone-300 group-hover:text-emerald-500 transition-colors" />
+                        <ArrowUpRight className="w-4 h-4 text-stone-300 group-hover:text-emerald-500 transition-colors" />
                       </div>
                     </button>
                   );
@@ -216,11 +216,5 @@ const Dashboard: React.FC<Props> = ({ data, onExport, onNavigateToEmployee, user
     </div>
   );
 };
-
-const ArrowRight = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
-  </svg>
-);
 
 export default Dashboard;

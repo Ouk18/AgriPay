@@ -21,12 +21,13 @@ interface Props {
   onQuickHarvest: (date: string) => void;
   onQuickTask: (date: string) => void;
   onQuickAdvance: (date: string) => void;
+  canManage?: boolean;
 }
 
 const CalendarView: React.FC<Props> = ({ 
   employees, entrepreneurs, harvests, advances, workTasks, rainEvents, 
   onDeleteHarvest, onDeleteAdvance, onDeleteTask, onAddRain, onDeleteRain,
-  onQuickHarvest, onQuickTask, onQuickAdvance
+  onQuickHarvest, onQuickTask, onQuickAdvance, canManage = false
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
@@ -88,7 +89,6 @@ const CalendarView: React.FC<Props> = ({
               >
                 <span className={`text-sm md:text-xl font-black ${isSelected && !isToday ? 'text-emerald-700' : ''}`}>{day}</span>
                 
-                {/* ICONES D'ACTIVITÉ AGRANDIES POUR PC */}
                 <div className="flex flex-wrap gap-0.5 md:gap-1.5 justify-center mt-auto w-full pb-1 md:pb-2 overflow-hidden px-1">
                   {hasRain && <CloudRain className={`w-2.5 h-2.5 md:w-5 md:h-5 ${isToday ? 'text-white' : 'text-blue-400'}`} />}
                   {dayHarvests.map((h, idx) => {
@@ -115,44 +115,36 @@ const CalendarView: React.FC<Props> = ({
         <div className="flex flex-col gap-4">
           <div className="flex justify-between items-center px-2">
             <div>
-               <h4 className="font-black text-lg text-emerald-950 tracking-tighter">Activités du Jour</h4>
+               <h4 className="font-black text-lg text-emerald-950 tracking-tighter">Journal du Jour</h4>
                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedDate && new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
             </div>
-            <button onClick={() => selectedDate && onAddRain(selectedDate)} className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest btn-haptic">
-              <CloudRain className="w-4 h-4" /> Pluie
-            </button>
+            {canManage && (
+              <button onClick={() => selectedDate && onAddRain(selectedDate)} className="flex items-center gap-2 px-5 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest btn-haptic">
+                <CloudRain className="w-4 h-4" /> Noter Pluie
+              </button>
+            )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 px-2">
-            <button 
-              onClick={() => selectedDate && onQuickHarvest(selectedDate)}
-              className="flex flex-col items-center gap-1.5 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 btn-haptic"
-            >
-              <Scale className="w-5 h-5" />
-              <span className="text-[9px] font-black uppercase">+ Récolte</span>
-            </button>
-            <button 
-              onClick={() => selectedDate && onQuickTask(selectedDate)}
-              className="flex flex-col items-center gap-1.5 p-4 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100 btn-haptic"
-            >
-              <Pickaxe className="w-5 h-5" />
-              <span className="text-[9px] font-black uppercase">+ Travail</span>
-            </button>
-            <button 
-              onClick={() => selectedDate && onQuickAdvance(selectedDate)}
-              className="flex flex-col items-center gap-1.5 p-4 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100 btn-haptic"
-            >
-              <Wallet className="w-5 h-5" />
-              <span className="text-[9px] font-black uppercase">+ Avance</span>
-            </button>
-          </div>
+          {canManage && (
+            <div className="grid grid-cols-3 gap-2 px-2">
+              <button onClick={() => selectedDate && onQuickHarvest(selectedDate)} className="flex flex-col items-center gap-1.5 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 btn-haptic">
+                <Scale className="w-5 h-5" /><span className="text-[9px] font-black uppercase">+ Récolte</span>
+              </button>
+              <button onClick={() => selectedDate && onQuickTask(selectedDate)} className="flex flex-col items-center gap-1.5 p-4 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100 btn-haptic">
+                <Pickaxe className="w-5 h-5" /><span className="text-[9px] font-black uppercase">+ Travail</span>
+              </button>
+              <button onClick={() => selectedDate && onQuickAdvance(selectedDate)} className="flex flex-col items-center gap-1.5 p-4 bg-amber-50 text-amber-700 rounded-2xl border border-amber-100 btn-haptic">
+                <Wallet className="w-5 h-5" /><span className="text-[9px] font-black uppercase">+ Sortie</span>
+              </button>
+            </div>
+          )}
         </div>
         
         <div className="space-y-3">
           {[...dailyRain, ...dailyHarvests, ...dailyTasks, ...dailyAdvances].length === 0 ? (
             <div className="text-center py-12 px-6 space-y-3 opacity-30">
               <Info className="w-10 h-10 mx-auto" />
-              <p className="text-xs font-black uppercase tracking-widest">Rien à signaler</p>
+              <p className="text-xs font-black uppercase tracking-widest">Aucune donnée</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -160,12 +152,9 @@ const CalendarView: React.FC<Props> = ({
                 <div key={r.id} className="flex justify-between items-center p-5 bg-blue-50 text-blue-900 rounded-[2rem] border border-blue-100">
                   <div className="flex items-center gap-4">
                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-sm"><CloudRain className="w-6 h-6" /></div>
-                     <div>
-                       <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Météo</span>
-                       <span className="font-black text-sm block">Pluie {r.intensity} ({r.period})</span>
-                     </div>
+                     <div><span className="text-[9px] font-black uppercase tracking-widest opacity-60">Météo</span><span className="font-black text-sm block">Pluie {r.intensity} ({r.period})</span></div>
                   </div>
-                  <button onClick={() => onDeleteRain(r.id)} className="p-3 bg-white/50 text-red-500 rounded-2xl active:scale-75"><Trash2 className="w-5 h-5" /></button>
+                  {canManage && <button onClick={() => onDeleteRain(r.id)} className="p-3 bg-white/50 text-red-500 rounded-2xl active:scale-75"><Trash2 className="w-5 h-5" /></button>}
                 </div>
               ))}
               
@@ -186,7 +175,7 @@ const CalendarView: React.FC<Props> = ({
                       <div>
                         <p className="font-black text-sm text-emerald-950">{isExternal ? en?.name : emp?.name}</p>
                         <p className={`text-[10px] font-bold uppercase tracking-widest ${isExternal ? 'text-blue-600' : isAdvance ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {isHarvest ? `${item.weight}kg ${item.crop}` : isTask ? item.description : `${item.category || 'Paiement'} ${item.paymentMethod}`}
+                            {isHarvest ? `${item.weight}kg ${item.crop}` : isTask ? item.description : `${item.category || 'Paiement'}`}
                         </p>
                       </div>
                     </div>
@@ -196,13 +185,11 @@ const CalendarView: React.FC<Props> = ({
                             {isAdvance || isExternal ? `-${item.amount.toLocaleString()} F` : isTask ? `${item.amount.toLocaleString()} F` : `${(item.weight * item.payRate).toLocaleString()} F`}
                         </span>
                       </div>
-                      <button onClick={() => {
-                          if (isHarvest) onDeleteHarvest(item.id);
-                          else if (isTask) onDeleteTask(item.id);
-                          else onDeleteAdvance(item.id);
-                      }} className="p-3 bg-white text-gray-300 hover:text-red-500 rounded-2xl shadow-sm active:scale-75">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {canManage && (
+                        <button onClick={() => { if (isHarvest) onDeleteHarvest(item.id); else if (isTask) onDeleteTask(item.id); else onDeleteAdvance(item.id); }} className="p-3 bg-white text-gray-300 hover:text-red-500 rounded-2xl shadow-sm active:scale-75">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

@@ -1,16 +1,16 @@
-
-export type CropType = 'HEVEA' | 'CACAO';
+export type CropType = 'HEVEA' | 'CACAO' | 'MANOEUVRE' | 'CONTRACTUEL' | 'GERANT';
 export type EmployeeStatus = 'ACTIF' | 'DEMISSIONNE';
 export type RainIntensity = 'FAIBLE' | 'MODERE' | 'FORTE';
 export type RainPeriod = 'MATIN' | 'APRES-MIDI' | 'NUIT';
 export type PaymentMethod = 'ESPECES' | 'VIREMENT';
-export type UserRole = 'ADMIN' | 'GERANT' | 'EMPLOYE';
+export type UserRole = 'ADMIN' | 'GERANT' | 'EMPLOYE' | 'FOURNISSEUR';
 export type ExpenseCategory = 'AVANCE' | 'ENGRAIS' | 'MATERIEL' | 'TRANSPORT' | 'TRAVAUX' | 'DIVERS';
 
 export interface UserProfile {
   id: string;
-  email: string;
+  username: string; // Identifiant libre (ex: koffi_gerant)
   role: UserRole;
+  linked_entity_id?: string;
 }
 
 export interface Employee {
@@ -32,6 +32,7 @@ export interface Entrepreneur {
   specialty?: string;
   phone?: string;
   color: string;
+  user_id?: string;
 }
 
 export interface Harvest {
@@ -51,10 +52,10 @@ export interface WorkTask {
   amount: number;
 }
 
-export interface Advance { // Utilisé pour toutes les dépenses
+export interface Advance {
   id: string;
-  employeeId?: string; // Si lié à un employé (avance)
-  entrepreneurId?: string; // Si lié à un prestataire/achat
+  employeeId?: string;
+  entrepreneurId?: string;
   date: string;
   amount: number;
   category: ExpenseCategory;
@@ -85,4 +86,5 @@ export interface AppData {
   workTasks: WorkTask[];
   rainEvents: RainEvent[];
   settings: MarketSettings;
+  profiles: UserProfile[];
 }

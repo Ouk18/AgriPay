@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Employee, EmployeeStatus, CropType, Harvest, Advance, WorkTask, Entrepreneur } from '../types.ts';
 import { 
@@ -6,7 +5,7 @@ import {
   X, Scale, Wallet, ReceiptText,
   User, PhoneCall, Trash2, Banknote, Pickaxe,
   PlusCircle, Truck, Briefcase, Plus, ShoppingBag, ArrowRight,
-  CheckCircle2, TrendingDown, ShieldAlert
+  CheckCircle2, TrendingDown, ShieldAlert, Edit3, Settings
 } from 'lucide-react';
 import EmployeeForm from './EmployeeForm.tsx';
 import EntrepreneurForm from './EntrepreneurForm.tsx';
@@ -21,6 +20,7 @@ interface Props {
   onSelectId: (id: string | null) => void;
   onAdd: (emp: any) => Promise<void>;
   onAddEntrepreneur: (en: any) => Promise<void>;
+  onUpdateEmployee: (id: string, emp: any) => Promise<void>;
   onUpdateStatus: (id: string, status: EmployeeStatus) => void;
   onClearBalance: (employeeId: string, amount: number) => void;
   onQuickHarvest: (employeeId: string) => void;
@@ -33,17 +33,18 @@ interface Props {
 
 const EmployeeManager: React.FC<Props> = ({ 
   employees, entrepreneurs, harvests, advances, workTasks, selectedId, onSelectId, 
-  onAdd, onAddEntrepreneur, onUpdateStatus, onClearBalance, onQuickHarvest, onQuickTask,
+  onAdd, onAddEntrepreneur, onUpdateEmployee, onUpdateStatus, onClearBalance, onQuickHarvest, onQuickTask,
   onDeleteEmployee, onDeleteEntrepreneur, canEdit = true, canDelete = false
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'employees' | 'entrepreneurs'>('employees');
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showAddEntrepreneur, setShowAddEntrepreneur] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  
   const selectedEmployee = employees.find(e => e.id === selectedId);
 
   return (
     <div className="space-y-10">
-      {/* SECTION HEADER ACTIONS */}
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-1">
@@ -51,8 +52,8 @@ const EmployeeManager: React.FC<Props> = ({
             <div className="flex items-center gap-3">
               <p className="text-stone-500 font-bold text-sm md:text-base">Gestion des manœuvres et prestataires.</p>
               {canDelete && (
-                <span className="flex items-center gap-1 px-3 py-1 bg-rose-600 text-white rounded-full text-[9px] font-black uppercase tracking-tighter animate-pulse shadow-lg shadow-rose-600/20">
-                  <ShieldAlert className="w-3 h-3" /> Mode Gestionnaire Actif
+                <span className="flex items-center gap-1 px-3 py-1 bg-rose-600 text-white rounded-full text-[9px] font-black uppercase tracking-tighter shadow-lg shadow-rose-600/20">
+                  <ShieldAlert className="w-3 h-3" /> Mode Administrateur
                 </span>
               )}
             </div>
@@ -63,7 +64,6 @@ const EmployeeManager: React.FC<Props> = ({
           </div>
         </div>
         
-        {/* TAB SELECTOR */}
         <div className="flex bg-stone-100 p-1.5 rounded-[2rem] border border-stone-200 w-full md:max-w-md">
           <button onClick={() => setActiveSubTab('employees')} className={`flex-1 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'employees' ? 'bg-white text-emerald-900 shadow-sm border border-stone-200' : 'text-stone-400'}`}>Manœuvres ({employees.length})</button>
           <button onClick={() => setActiveSubTab('entrepreneurs')} className={`flex-1 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeSubTab === 'entrepreneurs' ? 'bg-white text-emerald-900 shadow-sm border border-stone-200' : 'text-stone-400'}`}>Prestataires ({entrepreneurs.length})</button>
@@ -91,16 +91,14 @@ const EmployeeManager: React.FC<Props> = ({
                     <div>
                       <h4 className="text-lg font-black text-emerald-950 leading-tight">{emp.name}</h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full ${emp.crop === 'HEVEA' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{emp.crop}</span>
+                        <span className={`text-[8px] font-black uppercase px-3 py-1 rounded-full ${['HEVEA', 'CACAO'].includes(emp.crop) ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-600'}`}>{emp.crop}</span>
                       </div>
                     </div>
                   </div>
-                  {/* BOUTON SUPPRESSION EMPLOYÉ - FORCE VISIBILITÉ */}
                   {canDelete && (
                     <button 
                       onClick={(e) => { e.stopPropagation(); onDeleteEmployee(emp.id); }}
                       className="p-4 bg-rose-600 text-white rounded-2xl shadow-xl shadow-rose-600/30 hover:bg-rose-700 hover:scale-110 transition-all active:scale-90 z-20"
-                      title="Supprimer définitivement"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -134,12 +132,10 @@ const EmployeeManager: React.FC<Props> = ({
                     <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mt-1">{en.specialty || 'Fournisseur'}</p>
                   </div>
                 </div>
-                {/* BOUTON SUPPRESSION PRESTATAIRE - FORCE VISIBILITÉ */}
                 {canDelete && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); onDeleteEntrepreneur(en.id); }} 
                     className="p-4 bg-rose-600 text-white rounded-2xl shadow-xl shadow-rose-600/30 hover:bg-rose-700 hover:scale-110 transition-all active:scale-90"
-                    title="Supprimer prestataire"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>
@@ -152,8 +148,8 @@ const EmployeeManager: React.FC<Props> = ({
 
       {showAddEmployee && <EmployeeForm onClose={() => setShowAddEmployee(false)} onSubmit={async (e) => { await onAdd(e); setShowAddEmployee(false); }} />}
       {showAddEntrepreneur && <EntrepreneurForm onClose={() => setShowAddEntrepreneur(false)} onSubmit={async (en) => { await onAddEntrepreneur(en); setShowAddEntrepreneur(false); }} />}
+      {editingEmployee && <EmployeeForm initialData={editingEmployee} onClose={() => setEditingEmployee(null)} onSubmit={async (e) => { await onUpdateEmployee(editingEmployee.id, e); setEditingEmployee(null); onSelectId(null); }} />}
 
-      {/* MODAL PROFIL EMPLOYÉ */}
       {selectedEmployee && (
         <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-6 bg-emerald-950/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-t-[3.5rem] md:rounded-[3.5rem] shadow-[0_-20px_60px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col animate-in slide-in-from-bottom duration-300">
@@ -171,7 +167,10 @@ const EmployeeManager: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
-                <button onClick={() => onSelectId(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingEmployee(selectedEmployee)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all"><Edit3 className="w-6 h-6" /></button>
+                  <button onClick={() => onSelectId(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+                </div>
               </div>
             </div>
             
@@ -226,7 +225,6 @@ const EmployeeManager: React.FC<Props> = ({
                 </div>
               </div>
 
-              {/* ZONE DE DANGER EXPLICITE DANS LE PROFIL */}
               {canDelete && (
                 <div className="pt-8 mt-4 border-t border-rose-100 space-y-4">
                    <div className="flex items-center gap-3 justify-center text-rose-600">
