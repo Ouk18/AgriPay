@@ -18,7 +18,7 @@ import RainForm from './components/RainForm.tsx';
 import TaskForm from './components/TaskForm.tsx';
 import Auth from './components/Auth.tsx';
 
-const APP_VERSION = "v3.2.8";
+const APP_VERSION = "v3.2.9";
 
 const INITIAL_SETTINGS: MarketSettings = {
   payRateHevea: 75,
@@ -64,7 +64,11 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       await supabase.auth.signOut();
+      // On garde uniquement l'identifiant pour la prochaine connexion
+      const savedId = localStorage.getItem('agripay_remembered_id');
       localStorage.clear();
+      if (savedId) localStorage.setItem('agripay_remembered_id', savedId);
+      
       sessionStorage.clear();
       window.location.reload();
     } catch (e) {
@@ -144,14 +148,12 @@ const App: React.FC = () => {
 
   const handleCreateAccount = async (username: string, pass: string, role: UserRole, entityId?: string) => {
     try {
-      // Nettoyage strict pour l'email technique
       const cleanUsername = username.toLowerCase().trim()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Supprime les accents
-        .replace(/[^a-z0-9]/g, ""); // Ne garde QUE les lettres et chiffres
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+        .replace(/[^a-z0-9]/g, ""); 
       
-      if (cleanUsername.length < 3) throw new Error("Le nom d'utilisateur est trop court ou contient des caractères interdits.");
+      if (cleanUsername.length < 3) throw new Error("Le nom d'utilisateur est trop court.");
 
-      // Domaine plus "standard" pour éviter les filtres de domaine invalide
       const internalEmail = `${cleanUsername}@agripay-manager.pro`;
       
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -160,15 +162,9 @@ const App: React.FC = () => {
         options: { data: { username, role, linked_entity_id: entityId } }
       });
 
-      if (authError) {
-        if (authError.message.includes("invalid")) {
-          throw new Error(`Supabase rejette l'email "${internalEmail}". Désactivez la validation d'email (Confirm Email) dans votre Dashboard Supabase > Auth > Settings.`);
-        }
-        throw authError;
-      }
+      if (authError) throw authError;
 
       if (authData.user) {
-        // Insertion forcée dans Profiles avec l'email
         const { error: profileError } = await supabase.from('profiles').insert([{
           id: authData.user.id,
           email: internalEmail,
@@ -177,9 +173,7 @@ const App: React.FC = () => {
           linked_entity_id: entityId
         }]);
 
-        if (profileError) {
-          console.warn("Échec insertion profil:", profileError.message);
-        }
+        if (profileError) console.warn("Échec insertion profil:", profileError.message);
         
         if (entityId) {
           const table = role === 'EMPLOYE' ? 'employees' : 'entrepreneurs';
@@ -260,7 +254,7 @@ const App: React.FC = () => {
          <div className="p-10 bg-emerald-900 rounded-[3rem] shadow-2xl animate-pulse">
            <Scale className="w-16 h-16" />
          </div>
-         <h1 className="text-3xl font-black">Chargement...</h1>
+         <h1 className="text-3xl font-black">AgriPay Manager...</h1>
          {errorMessage && <p className="text-rose-400 font-bold">{errorMessage}</p>}
       </div>
     </div>
@@ -270,7 +264,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-stone-50 flex flex-col pb-24 md:pb-0 safe-top text-slate-900">
       <header className="h-24 bg-white/80 backdrop-blur-xl border-b border-stone-200 px-6 md:px-12 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-10">
-          <div className="flex items-center gap-4 group cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="flex items-center gap-4 group cursor-pointer" onClick={() => setActiveTab('journal')}>
             <div className="bg-emerald-900 p-3 rounded-[1.25rem] text-white shadow-lg transition-transform group-hover:scale-105">
               <Scale className="w-6 h-6" />
             </div>
@@ -286,9 +280,9 @@ const App: React.FC = () => {
           </div>
           <nav className="hidden md:flex items-center gap-1 bg-stone-100 p-1.5 rounded-2xl">
             {[
+              { id: 'journal', label: 'Journal', icon: BookOpen },
               { id: 'dashboard', label: 'Bilan', icon: LayoutDashboard },
               { id: 'employees', label: 'Équipe', icon: Users, roles: ['ADMIN', 'GERANT'] },
-              { id: 'journal', label: 'Journal', icon: BookOpen },
               { id: 'settings', label: 'Options', icon: SettingsIcon, roles: ['ADMIN', 'GERANT'] }
             ].map(tab => {
               if (tab.roles && profile && !tab.roles.includes(profile.role)) return null;
@@ -309,6 +303,21 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full">
+        {activeTab === 'journal' && (
+          <CalendarView 
+            employees={data.employees} entrepreneurs={data.entrepreneurs} harvests={data.harvests} advances={data.advances} workTasks={data.workTasks} rainEvents={data.rainEvents} 
+            onDeleteHarvest={(id) => setPendingDeletion({table:'harvests', id, label:'cette récolte'})} 
+            onDeleteAdvance={(id) => setPendingDeletion({table:'advances', id, label:'cette dépense'})} 
+            onDeleteTask={(id) => setPendingDeletion({table:'work_tasks', id, label:'ce travail'})} 
+            onAddRain={(date) => setShowRainModal({ date })} 
+            onDeleteRain={(id) => setPendingDeletion({table:'rain_events', id, label:'cette météo'})} 
+            onQuickHarvest={(date) => canManage && setShowHarvestModal({ date })}
+            onQuickTask={(date) => canManage && setShowTaskModal({ date })}
+            onQuickAdvance={(date) => canManage && setShowExpenseModal({ date, category: 'AVANCE' })}
+            canManage={canManage}
+          />
+        )}
+
         {activeTab === 'dashboard' && <Dashboard data={data} onExport={handleExportCSV} onNavigateToEmployee={(id) => { setSelectedEmployeeId(id); setActiveTab('employees'); }} userRole={profile?.role} />}
         
         {activeTab === 'employees' && canManage && (
@@ -341,21 +350,6 @@ const App: React.FC = () => {
             onDeleteEntrepreneur={(id) => setPendingDeletion({table:'entrepreneurs', id, label:"le Prestataire"})} 
             canDelete={isAdmin}
             canEdit={canManage}
-          />
-        )}
-
-        {activeTab === 'journal' && (
-          <CalendarView 
-            employees={data.employees} entrepreneurs={data.entrepreneurs} harvests={data.harvests} advances={data.advances} workTasks={data.workTasks} rainEvents={data.rainEvents} 
-            onDeleteHarvest={(id) => setPendingDeletion({table:'harvests', id, label:'cette récolte'})} 
-            onDeleteAdvance={(id) => setPendingDeletion({table:'advances', id, label:'cette dépense'})} 
-            onDeleteTask={(id) => setPendingDeletion({table:'work_tasks', id, label:'ce travail'})} 
-            onAddRain={(date) => setShowRainModal({ date })} 
-            onDeleteRain={(id) => setPendingDeletion({table:'rain_events', id, label:'cette météo'})} 
-            onQuickHarvest={(date) => canManage && setShowHarvestModal({ date })}
-            onQuickTask={(date) => canManage && setShowTaskModal({ date })}
-            onQuickAdvance={(date) => canManage && setShowExpenseModal({ date, category: 'AVANCE' })}
-            canManage={canManage}
           />
         )}
 
@@ -398,16 +392,18 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* Corrected h.pay_rate to h.payRate */}
       {showHarvestModal && <HarvestForm employees={data.employees.filter(e => e.status === 'ACTIF')} settings={data.settings} onClose={() => setShowHarvestModal(false)} onSubmit={async (h) => { await supabase.from('harvests').insert([{employee_id: h.employeeId, weight: h.weight, pay_rate: h.payRate, date: h.date, crop: h.crop}]); await fetchData(); setShowHarvestModal(false); }} initialEmployeeId={typeof showHarvestModal === 'object' ? (showHarvestModal as any).employeeId : undefined} initialDate={typeof showHarvestModal === 'object' ? (showHarvestModal as any).date : undefined} />}
       {showTaskModal && <TaskForm employees={data.employees.filter(e => e.status === 'ACTIF')} onClose={() => setShowTaskModal(false)} onSubmit={async (t) => { await supabase.from('work_tasks').insert([{employee_id: t.employeeId, description: t.description, amount: t.amount, date: t.date}]); await fetchData(); setShowTaskModal(false); }} initialEmployeeId={typeof showTaskModal === 'object' ? (showTaskModal as any).employeeId : undefined} initialDate={typeof showTaskModal === 'object' ? (showTaskModal as any).date : undefined} />}
+      {/* Corrected a.payment_method to a.paymentMethod */}
       {showExpenseModal && <ExpenseForm employees={data.employees} entrepreneurs={data.entrepreneurs} onClose={() => setShowExpenseModal(false)} onSubmit={async (a) => { await supabase.from('advances').insert([{employee_id: a.employeeId, entrepreneur_id: a.entrepreneurId, amount: a.amount, date: a.date, category: a.category, payment_method: a.paymentMethod, notes: a.notes}]); await fetchData(); setShowExpenseModal(false); }} initialData={typeof showExpenseModal === 'object' ? showExpenseModal : undefined} />}
       {showRainModal && <RainForm date={showRainModal.date} onClose={() => setShowRainModal(null)} onSubmit={async (r) => { await supabase.from('rain_events').insert([r]); await fetchData(); setShowRainModal(null); }} />}
       
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-stone-200 px-6 flex items-center justify-between z-40 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         {[
+          { id: 'journal', label: 'Journal', icon: BookOpen },
           { id: 'dashboard', label: 'Bilan', icon: LayoutDashboard },
           { id: 'employees', label: 'Équipe', icon: Users, roles: ['ADMIN', 'GERANT'] },
-          { id: 'journal', label: 'Journal', icon: BookOpen },
           { id: 'settings', label: 'Options', icon: SettingsIcon, roles: ['ADMIN', 'GERANT'] }
         ].map(tab => {
           if (tab.roles && profile && !tab.roles.includes(profile.role)) return null;
