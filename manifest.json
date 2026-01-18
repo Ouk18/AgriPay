@@ -1,0 +1,26 @@
+
+{
+  "short_name": "AgriPay",
+  "name": "AgriPay - Gestion de Plantation",
+  "description": "Gestion professionnelle des paies, récoltes et avances pour plantations.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2682/2682062.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2682/2682062.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#065f46",
+  "background_color": "#f9fafb",
+  "orientation": "portrait",
+  "categories": ["finance", "productivity"]
+}

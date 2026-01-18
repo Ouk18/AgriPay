@@ -1,0 +1,5 @@
+{
+  "name": "AgriPay Manager",
+  "description": "Système complet de gestion de paie, d'avances et de récoltes pour les plantations d'hévéa et de cacao avec calendrier intégré et suivi des cours du marché.",
+  "requestFramePermissions": []
+}
