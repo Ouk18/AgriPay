@@ -157,7 +157,7 @@ const SettingsView: React.FC<Props> = ({
                  </div>
                  <p className="text-[10px] font-bold text-amber-900/70 leading-relaxed">
                    Si vous recevez l'erreur <b>"Email is invalid"</b>, allez dans votre console Supabase : <br/>
-                   <b>Auth > Settings > Email Auth</b> et décochez <b>"Confirm email"</b>.
+                   <b>{"Auth > Settings > Email Auth"}</b> et décochez <b>"Confirm email"</b>.
                  </p>
               </div>
 
